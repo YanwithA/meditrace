@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:meditrace1/screens/auth/login_screen.dart';
-import 'package:meditrace1/screens/auth/register_screen.dart';
+import 'package:meditrace/screens/auth/login_screen.dart';
+import 'package:meditrace/screens/auth/register_screen.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,11 +21,14 @@ class MediTraceApp extends StatelessWidget {
       theme: ThemeData(primarySwatch: Colors.blue),
       debugShowCheckedModeBanner: false,
       home: const AuthWrapper(),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+      },
     );
   }
 }
 
-/// This widget decides whether to show Register, Login, or Home
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -33,26 +37,23 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // If logged in -> show Home
         if (snapshot.hasData) {
           return HomeScreen(user: snapshot.data!);
         }
 
-        // If not logged in -> show Register first
-        return const RegisterScreen();
+        // Show login screen first instead of register
+        return const LoginScreen();
       },
     );
   }
 }
 
-/// A simple HomeScreen after login
 class HomeScreen extends StatelessWidget {
   final User user;
   const HomeScreen({super.key, required this.user});

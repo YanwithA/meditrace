@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:meditrace1/screens/auth/register_screen.dart';
-import 'package:meditrace1/screens/home_screen.dart';
-import 'package:meditrace1/screens/auth/forgot_password_screen.dart';
+import 'package:meditrace/screens/auth/register_screen.dart';
+import 'package:meditrace/screens/home_screen.dart';
+import 'package:meditrace/screens/auth/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
