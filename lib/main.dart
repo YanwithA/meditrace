@@ -4,10 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:meditrace/screens/auth/login_screen.dart';
 import 'package:meditrace/screens/auth/register_screen.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(); // keep Firebase initialized
   runApp(const MediTraceApp());
 }
 
@@ -47,11 +46,21 @@ class AuthWrapper extends StatelessWidget {
           return HomeScreen(user: snapshot.data!);
         }
 
-        // Show login screen first instead of register
+        // Show login screen first
         return const LoginScreen();
       },
     );
   }
+}
+
+// Create a dummy User class for temporary use
+class DummyUser implements User {
+  @override
+  String get email => "guest@example.com";
+
+  // Implement required fields with dummy values
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class HomeScreen extends StatelessWidget {
@@ -67,7 +76,11 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await FirebaseAuth.instance.signOut();
+              // If real user, sign out; otherwise just navigate
+              try {
+                await FirebaseAuth.instance.signOut();
+              } catch (_) {}
+              Navigator.pushReplacementNamed(context, '/login');
             },
           ),
         ],

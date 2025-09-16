@@ -50,5 +50,4 @@ flutter {
     source = "../.."
 }
 
-// ADD THIS AT THE VERY BOTTOM
-apply(plugin = "com.google.gms.google-services")
+// Google services plugin is already applied via the plugins block above.
