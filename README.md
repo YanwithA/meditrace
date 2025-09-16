@@ -1,6 +1,6 @@
-# meditrace
+# Meditrace
 
-A new Flutter project.
+MediTrace is a comprehensive Flutter-based mobile application designed to simplify medication management and ensure user safety through intelligent features.
 
 ## Getting Started
 
