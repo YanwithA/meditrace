@@ -1,37 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:http/http.dart' as http;
 
-void main() {
-  runApp(const MediTraceApp());
-}
-
-class MediTraceApp extends StatelessWidget {
-  const MediTraceApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MediTrace',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: const HomeScreen(),
-      debugShowCheckedModeBanner: false,
-      routes: {
-        '/home': (context) => const HomeScreen(),
-        '/notification': (context) => const NotificationScreen(),
-        '/interaction': (context) => const InteractionScreen(),
-        '/pharmacy': (context) => const PharmacyScreen(),
-        '/profile': (context) => const ProfileScreen(),
-        '/scan': (context) => const ScanScreen(),
-        '/medicine-detail': (context) => const MedicineDetailScreen(),
-      },
-    );
-  }
-}
+import 'scan_screen.dart';
+import 'medicine_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final User user;
+  const HomeScreen({super.key, required this.user});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -40,23 +18,94 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
-  String _selectedCategory = 'All';
+  final DatabaseReference _dbRef =
+  FirebaseDatabase.instance.ref().child("users");
+  List<Map<String, dynamic>> _recentHistory = [];
+  bool _isLoading = false;
 
-  final List<String> categories = [
-    'All',
-    'Paracetamol',
-    'Ibuprofen',
-    'Naproxen'
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentHistory();
+  }
 
-  final List<Map<String, dynamic>> recentScans = [
-    {
-      'name': 'Panadol Paracetamol',
-      'status': 'Genuine',
-      'dosage': 'Tablets',
-      'expiry': 'SEP 2025',
-    },
-  ];
+  Future<void> _loadRecentHistory() async {
+    final snapshot =
+    await _dbRef.child(widget.user.uid).child("searchHistory").get();
+
+    if (snapshot.exists) {
+      final data = snapshot.value as Map;
+      final history = data.entries.map((e) {
+        final val = Map<String, dynamic>.from(e.value);
+        return val;
+      }).toList();
+
+      setState(() {
+        _recentHistory = history.reversed.take(3).toList();
+      });
+    }
+  }
+
+  Future<void> _searchMedicine(String query) async {
+    if (query.trim().isEmpty) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final url =
+          "https://api.fda.gov/drug/label.json?search=openfda.brand_name:$query&limit=1";
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data['results'] != null && data['results'].isNotEmpty) {
+          final medicine = data['results'][0];
+
+          final medicineData = {
+            "name": medicine['openfda']?['brand_name']?[0] ?? query,
+            "status": "Genuine",
+            "dosage": medicine['dosage_and_administration']?[0] ?? "Unknown",
+            "expiry": "Not provided",
+            "side_effects": medicine['adverse_reactions'] != null
+                ? [medicine['adverse_reactions'][0]]
+                : ["No side effects listed"],
+          };
+
+          await _dbRef
+              .child(widget.user.uid)
+              .child("searchHistory")
+              .push()
+              .set(medicineData);
+
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MedicineDetailScreen(medicineData: medicineData),
+              ),
+            );
+          }
+
+          _loadRecentHistory();
+        } else {
+          _showError("No results found for $query");
+        }
+      } else {
+        _showError("API error: ${response.statusCode}");
+      }
+    } catch (e) {
+      _showError("Error: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          '9:41',
+          'MediTrace',
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -86,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar
+            // 🔹 Search Bar
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -101,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: TextField(
                 controller: _searchController,
+                onSubmitted: _searchMedicine,
                 decoration: InputDecoration(
                   hintText: 'Search medicine...',
                   border: InputBorder.none,
@@ -111,112 +161,44 @@ class _HomeScreenState extends State<HomeScreen> {
                       _searchController.clear();
                     },
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16.0),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            // Categories
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12.0),
-                    child: ChoiceChip(
-                      label: Text(categories[index]),
-                      selected: _selectedCategory == categories[index],
-                      selectedColor: const Color(0xFF2E86AB),
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedCategory = categories[index];
-                        });
-                      },
-                      labelStyle: TextStyle(
-                        color: _selectedCategory == categories[index]
-                            ? Colors.white
-                            : Colors.black,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Paracetamol Section
-            const Text(
-              'Paracetamol',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Medicine Card
+
+            if (_isLoading) const Center(child: CircularProgressIndicator()),
+
+            // 🔹 Scan Medicine Button
             GestureDetector(
-              onTap: () {
-                Navigator.pushNamed(context, '/medicine-detail');
-              },
-              child: Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8.0),
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ScanScreen(user: widget.user),
+                  ),
+                );
+
+                if (result != null && result is Map<String, dynamic>) {
+                  await _dbRef
+                      .child(widget.user.uid)
+                      .child("searchHistory")
+                      .push()
+                      .set(result);
+
+                  if (mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            MedicineDetailScreen(medicineData: result),
                       ),
-                      child: const Icon(Icons.medication,
-                          color: Color(0xFF2E86AB), size: 30),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Panadol Paracetamol',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            '10 Tablets',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right, color: Colors.grey),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Scan Section
-            GestureDetector(
-              onTap: () {
-                Navigator.pushNamed(context, '/scan');
+                    );
+                  }
+
+                  _loadRecentHistory();
+                }
               },
               child: Container(
                 padding: const EdgeInsets.all(20.0),
@@ -241,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Scan and identify the medicine',
+                            'Scan Medicine',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -250,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           SizedBox(height: 4),
                           Text(
-                            'Verify authenticity and get details',
+                            'Use camera to verify and get details',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
@@ -264,20 +246,32 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            // Scan History
-            const Text(
-              'Scan History',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+
+            // 🔹 Recent Searches / Scans
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Recent Activity',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/history');
+                  },
+                  child: const Text("View All"),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: recentScans.length,
+              itemCount: _recentHistory.length,
               itemBuilder: (context, index) {
+                final item = _recentHistory[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12.0),
                   padding: const EdgeInsets.all(16.0),
@@ -295,30 +289,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Medicine name: ${recentScans[index]['name']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Medicine Status: ${recentScans[index]['status']}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: recentScans[index]['status'] == 'Genuine'
-                              ? Colors.green
-                              : Colors.red,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Dosage: ${recentScans[index]['dosage']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Expiry Date: ${recentScans[index]['expiry']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                      Text("Name: ${item['name']}"),
+                      Text("Status: ${item['status']}"),
+                      Text("Dosage: ${item['dosage']}"),
+                      Text("Expiry: ${item['expiry']}"),
                     ],
                   ),
                 );
@@ -327,179 +301,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          // Navigate to different screens
-          if (index == 1) {
-            Navigator.pushNamed(context, '/notification');
-          } else if (index == 2) {
-            Navigator.pushNamed(context, '/interaction');
-          } else if (index == 3) {
-            Navigator.pushNamed(context, '/pharmacy');
-          } else if (index == 4) {
-            Navigator.pushNamed(context, '/profile');
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications_none),
-            label: 'Notification',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.mediation),
-            label: 'Interaction',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.local_pharmacy),
-            label: 'Pharmacy',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-// Placeholder screens for navigation
-class NotificationScreen extends StatelessWidget {
-  const NotificationScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
-      body: const Center(child: Text('Notification Screen')),
-    );
-  }
-}
-
-class InteractionScreen extends StatelessWidget {
-  const InteractionScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Interactions')),
-      body: const Center(child: Text('Interaction Screen')),
-    );
-  }
-}
-
-class PharmacyScreen extends StatelessWidget {
-  const PharmacyScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pharmacies')),
-      body: const Center(child: Text('Pharmacy Screen')),
-    );
-  }
-}
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: const Center(child: Text('Profile Screen')),
-    );
-  }
-}
-
-class ScanScreen extends StatelessWidget {
-  const ScanScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Scan Medicine')),
-      body: const Center(child: Text('Scan Screen')),
-    );
-  }
-}
-
-class MedicineDetailScreen extends StatelessWidget {
-  const MedicineDetailScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Medicine Details')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Panadol Paracetamol',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Medicine Status: Genuine',
-                style: TextStyle(fontSize: 16, color: Colors.green),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Dosage: Tablets',
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Expiry Date: SEP 2025',
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Side effects:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSideEffectItem('diarrhea'),
-                  _buildSideEffectItem('increased sweating'),
-                  _buildSideEffectItem('loss of appetite'),
-                  _buildSideEffectItem('nausea or vomiting'),
-                  _buildSideEffectItem('stomach cramps or pain'),
-                  _buildSideEffectItem(
-                      'swelling, pain, or tenderness in the upper abdomen or stomach area'),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSideEffectItem(String effect) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('• ', style: TextStyle(fontSize: 16)),
-          Expanded(child: Text(effect, style: const TextStyle(fontSize: 16))),
-        ],
-      ),
     );
   }
 }

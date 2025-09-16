@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+
+// Screens
 import 'package:meditrace/screens/auth/register_screen.dart';
-import 'package:meditrace/screens/home_screen.dart';
 import 'package:meditrace/screens/auth/forgot_password_screen.dart';
+
+// Import MainWrapper from main.dart
+import 'package:meditrace/main.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -52,11 +56,13 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         }
 
-        // Navigate to Home screen
+        // ✅ Navigate to MainWrapper (with bottom navigation)
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => HomeScreen()),
+            MaterialPageRoute(
+              builder: (_) => MainWrapper(user: user),
+            ),
           );
         }
       } on FirebaseAuthException catch (e) {
@@ -154,7 +160,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(value)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -203,7 +210,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const ForgotPasswordScreen()),
+                                builder: (_) =>
+                                const ForgotPasswordScreen()),
                           );
                         },
                         child: const Text(
@@ -225,7 +233,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
                             : const Text(
                           'Login',
                           style: TextStyle(
