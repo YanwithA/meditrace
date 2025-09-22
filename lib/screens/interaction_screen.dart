@@ -1,445 +1,162 @@
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const MediTraceApp());
-}
-
-class MediTraceApp extends StatelessWidget {
-  const MediTraceApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MediTrace',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: const HomeScreen(),
-      debugShowCheckedModeBanner: false,
-      routes: {
-        '/home': (context) => const HomeScreen(),
-        '/notification': (context) => const NotificationScreen(),
-        '/interaction': (context) => const InteractionScreen(),
-        '/pharmacy': (context) => const PharmacyScreen(),
-        '/profile': (context) => const ProfileScreen(),
-        '/scan': (context) => const ScanScreen(),
-        '/medicine-detail': (context) => const MedicineDetailScreen(),
-      },
-    );
-  }
-}
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-  final TextEditingController _searchController = TextEditingController();
-  String _selectedCategory = 'All';
-
-  final List<String> categories = [
-    'All',
-    'Paracetamol',
-    'Ibuprofen',
-    'Naproxen'
-  ];
-
-  final List<Map<String, dynamic>> recentScans = [
-    {
-      'name': 'Panadol Paracetamol',
-      'status': 'Genuine',
-      'dosage': 'Tablets',
-      'expiry': 'SEP 2025',
-    },
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          '9:41',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.black),
-            onPressed: () {
-              Navigator.pushNamed(context, '/notification');
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Search Bar
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search medicine...',
-                  border: InputBorder.none,
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.grey),
-                    onPressed: () {
-                      _searchController.clear();
-                    },
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Categories
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12.0),
-                    child: ChoiceChip(
-                      label: Text(categories[index]),
-                      selected: _selectedCategory == categories[index],
-                      selectedColor: const Color(0xFF2E86AB),
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedCategory = categories[index];
-                        });
-                      },
-                      labelStyle: TextStyle(
-                        color: _selectedCategory == categories[index]
-                            ? Colors.white
-                            : Colors.black,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Paracetamol Section
-            const Text(
-              'Paracetamol',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Medicine Card
-            GestureDetector(
-              onTap: () {
-                Navigator.pushNamed(context, '/medicine-detail');
-              },
-              child: Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      child: const Icon(Icons.medication,
-                          color: Color(0xFF2E86AB), size: 30),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Panadol Paracetamol',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            '10 Tablets',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right, color: Colors.grey),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Scan Section
-            GestureDetector(
-              onTap: () {
-                Navigator.pushNamed(context, '/scan');
-              },
-              child: Container(
-                padding: const EdgeInsets.all(20.0),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E86AB),
-                  borderRadius: BorderRadius.circular(16.0),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(50.0),
-                      ),
-                      child: const Icon(Icons.camera_alt,
-                          color: Colors.white, size: 30),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Scan and identify the medicine',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Verify authenticity and get details',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Scan History
-            const Text(
-              'Scan History',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recentScans.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12.0),
-                  padding: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Medicine name: ${recentScans[index]['name']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Medicine Status: ${recentScans[index]['status']}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: recentScans[index]['status'] == 'Genuine'
-                              ? Colors.green
-                              : Colors.red,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Dosage: ${recentScans[index]['dosage']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Expiry Date: ${recentScans[index]['expiry']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          // Navigate to different screens
-          if (index == 1) {
-            Navigator.pushNamed(context, '/notification');
-          } else if (index == 2) {
-            Navigator.pushNamed(context, '/interaction');
-          } else if (index == 3) {
-            Navigator.pushNamed(context, '/pharmacy');
-          } else if (index == 4) {
-            Navigator.pushNamed(context, '/profile');
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications_none),
-            label: 'Notification',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.mediation),
-            label: 'Interaction',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.local_pharmacy),
-            label: 'Pharmacy',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Placeholder screens for navigation
-class NotificationScreen extends StatelessWidget {
-  const NotificationScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
-      body: const Center(child: Text('Notification Screen')),
-    );
-  }
-}
-
-class InteractionScreen extends StatelessWidget {
+class InteractionScreen extends StatefulWidget {
   const InteractionScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Interactions')),
-      body: const Center(child: Text('Interaction Screen')),
-    );
-  }
+  State<InteractionScreen> createState() => _InteractionScreenState();
 }
 
-class PharmacyScreen extends StatelessWidget {
-  const PharmacyScreen({super.key});
+class _InteractionScreenState extends State<InteractionScreen> {
+  final TextEditingController _drug1Controller = TextEditingController();
+  final TextEditingController _drug2Controller = TextEditingController();
+
+  String? _severity;
+  String? _description;
+
+  ///interactions map
+  final Map<String, Map<String, Map<String, String>>> interactions = {
+    "aspirin": {
+      "ibuprofen": {
+        "severity": "Moderate",
+        "description":
+        "Ibuprofen may reduce the cardioprotective antiplatelet effect of aspirin, especially if taken before aspirin. This could decrease aspirin’s effectiveness in preventing heart attack or stroke."
+      },
+      "warfarin": {
+        "severity": "High",
+        "description":
+        "Both aspirin and warfarin thin the blood. When taken together, they greatly increase the risk of severe bleeding (gastrointestinal or intracranial). This combination should be used only under strict medical supervision."
+      },
+      "clopidogrel": {
+        "severity": "High",
+        "description":
+        "Aspirin plus clopidogrel significantly increases bleeding risk. While sometimes prescribed together for heart conditions, this requires close monitoring by a doctor."
+      }
+    },
+    "warfarin": {
+      "ibuprofen": {
+        "severity": "High",
+        "description":
+        "NSAIDs like ibuprofen can cause stomach ulcers and bleeding. Combining with warfarin increases bleeding risk even further, including life-threatening internal bleeding."
+      },
+      "paracetamol": {
+        "severity": "Low",
+        "description":
+        "Occasional paracetamol (acetaminophen) use is usually safe with warfarin, but regular or high doses may increase warfarin’s effect, raising bleeding risk. INR monitoring may be needed."
+      },
+      "amiodarone": {
+        "severity": "High",
+        "description":
+        "Amiodarone can strongly increase warfarin’s blood-thinning effect, raising the risk of major bleeding. Dose adjustment and close INR monitoring are required."
+      }
+    },
+    "ibuprofen": {
+      "paracetamol": {
+        "severity": "Low",
+        "description":
+        "Ibuprofen and paracetamol are often used together safely for short-term pain relief. However, excessive use of either drug can cause liver (paracetamol) or kidney/stomach (ibuprofen) damage."
+      },
+      "prednisone": {
+        "severity": "Moderate",
+        "description":
+        "Both ibuprofen and corticosteroids (like prednisone) can irritate the stomach lining. Using them together raises the risk of stomach ulcers or bleeding."
+      }
+    },
+    "clopidogrel": {
+      "omeprazole": {
+        "severity": "Moderate",
+        "description":
+        "Omeprazole may reduce the effectiveness of clopidogrel by blocking its activation in the liver, lowering its ability to prevent clots. Alternative acid reducers (like pantoprazole) are preferred."
+      }
+    },
+    "metformin": {
+      "alcohol": {
+        "severity": "High",
+        "description":
+        "Heavy alcohol use while on metformin increases the risk of lactic acidosis, a rare but potentially fatal condition. Avoid excessive drinking while taking metformin."
+      }
+    },
+    "lisinopril": {
+      "potassium": {
+        "severity": "High",
+        "description":
+        "ACE inhibitors like lisinopril can raise potassium levels. Taking potassium supplements or salt substitutes may lead to dangerous hyperkalemia (irregular heartbeat, cardiac arrest)."
+      },
+      "ibuprofen": {
+        "severity": "Moderate",
+        "description":
+        "Ibuprofen can reduce the blood-pressure-lowering effect of lisinopril and may worsen kidney function when combined, especially in older adults or those with kidney disease."
+      }
+    },
+    "statins": {
+      "grapefruit": {
+        "severity": "Moderate",
+        "description":
+        "Grapefruit juice can increase the blood level of certain statins (simvastatin, atorvastatin), raising the risk of liver damage and muscle breakdown (rhabdomyolysis)."
+      }
+    }
+  };
+
+
+  void _checkInteraction() {
+    final drug1 = _drug1Controller.text.trim().toLowerCase();
+    final drug2 = _drug2Controller.text.trim().toLowerCase();
+
+    setState(() {
+      _severity = null;
+      _description = null;
+    });
+
+    if (drug1.isEmpty || drug2.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ Please enter both medicines")),
+      );
+      return;
+    }
+
+    // Look for drug1 -> drug2
+    if (interactions.containsKey(drug1) &&
+        interactions[drug1]!.containsKey(drug2)) {
+      setState(() {
+        _severity = interactions[drug1]![drug2]!["severity"];
+        _description = interactions[drug1]![drug2]!["description"];
+      });
+    }
+    // Look for drug2 -> drug1
+    else if (interactions.containsKey(drug2) &&
+        interactions[drug2]!.containsKey(drug1)) {
+      setState(() {
+        _severity = interactions[drug2]![drug1]!["severity"];
+        _description = interactions[drug2]![drug1]!["description"];
+      });
+    } else {
+      setState(() {
+        _severity = "Unknown";
+        _description = "No major interaction found in database.";
+      });
+    }
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case "high":
+        return Colors.red;
+      case "moderate":
+        return Colors.orange;
+      case "low":
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Pharmacies')),
-      body: const Center(child: Text('Pharmacy Screen')),
-    );
-  }
-}
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: const Center(child: Text('Profile Screen')),
-    );
-  }
-}
-
-class ScanScreen extends StatelessWidget {
-  const ScanScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Scan Medicine')),
-      body: const Center(child: Text('Scan Screen')),
-    );
-  }
-}
-
-class MedicineDetailScreen extends StatelessWidget {
-  const MedicineDetailScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Medicine Details')),
+      appBar: AppBar(
+        title: const Text("Drug Interaction Checker"),
+        backgroundColor: const Color(0xFF2E86AB),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
@@ -447,58 +164,98 @@ class MedicineDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Panadol Paracetamol',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Medicine Status: Genuine',
-                style: TextStyle(fontSize: 16, color: Colors.green),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Dosage: Tablets',
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Expiry Date: SEP 2025',
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Side effects:',
+                "Enter two medicines to check interactions",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSideEffectItem('diarrhea'),
-                  _buildSideEffectItem('increased sweating'),
-                  _buildSideEffectItem('loss of appetite'),
-                  _buildSideEffectItem('nausea or vomiting'),
-                  _buildSideEffectItem('stomach cramps or pain'),
-                  _buildSideEffectItem(
-                      'swelling, pain, or tenderness in the upper abdomen or stomach area'),
-                ],
+              const SizedBox(height: 20),
+
+              // Drug 1
+              TextField(
+                controller: _drug1Controller,
+                decoration: InputDecoration(
+                  labelText: "First Medicine",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.medication),
+                ),
               ),
+              const SizedBox(height: 16),
+
+              // Drug 2
+              TextField(
+                controller: _drug2Controller,
+                decoration: InputDecoration(
+                  labelText: "Second Medicine",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.medical_services),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _checkInteraction,
+                  icon: const Icon(Icons.search),
+                  label: const Text("Check Interaction"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E86AB),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Results
+              if (_severity != null && _description != null)
+                Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.warning,
+                            color: _getSeverityColor(_severity!),
+                            size: 36),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Severity: $_severity",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: _getSeverityColor(_severity!),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _description!,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ],
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSideEffectItem(String effect) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('• ', style: TextStyle(fontSize: 16)),
-          Expanded(child: Text(effect, style: const TextStyle(fontSize: 16))),
-        ],
       ),
     );
   }

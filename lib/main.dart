@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:meditrace/screens/services/roboflow_service.dart';
 
 import 'package:meditrace/screens/auth/login_screen.dart';
 import 'package:meditrace/screens/auth/register_screen.dart';
@@ -14,6 +15,13 @@ import 'package:meditrace/screens/pharmacy_screen.dart' as pharmacy_screen;
 import 'package:meditrace/screens/profile_screen.dart' as profile_screen;
 import 'package:meditrace/screens/notification_screen.dart' as notification_screen;
 
+
+// Global Roboflow client instance (equivalent to Python InferenceHTTPClient setup)
+final roboflow = RoboflowService(
+  apiKey: 'l5QBgJv58xaL9eaCh4rq',
+  modelId: 'medicine-box/1',
+  // apiHost defaults to 'serverless.roboflow.com'
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

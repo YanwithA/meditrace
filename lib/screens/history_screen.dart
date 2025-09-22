@@ -66,7 +66,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 children: [
                   Text("Status: ${item['status']}"),
                   Text("Dosage: ${item['dosage']}"),
-                  Text("Expiry: ${item['expiry']}"),
                 ],
               ),
             ),
