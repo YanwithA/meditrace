@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:meditrace/screens/services/roboflow_service.dart';
+import 'package:meditrace/screens/services/notification_service.dart';
 
 import 'package:meditrace/screens/auth/login_screen.dart';
 import 'package:meditrace/screens/auth/register_screen.dart';
@@ -26,6 +27,7 @@ final roboflow = RoboflowService(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await NotificationService.init();
   runApp(const MediTraceApp());
 }
 

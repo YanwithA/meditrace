@@ -1,10 +1,11 @@
+// lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import 'package:meditrace/screens/auth/register_screen.dart';
 import 'package:meditrace/screens/auth/forgot_password_screen.dart';
-import 'package:meditrace/screens/home_screen.dart'; // ✅ real HomeScreen
+import 'package:meditrace/main.dart'; // ✅ Import MainWrapper
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -41,7 +42,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final user = cred.user;
       if (user == null) {
-        throw FirebaseAuthException(code: 'unknown', message: 'Authentication failed');
+        throw FirebaseAuthException(
+            code: 'unknown', message: 'Authentication failed');
       }
 
       // 2) Bootstrap profile in Realtime DB if missing
@@ -56,18 +58,24 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
 
-      // 3) Go to real Home
+      // 3) Go to MainWrapper (✅ keeps bottom navigation bar)
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => HomeScreen(user: user)),
+        MaterialPageRoute(builder: (_) => MainWrapper(user: user)),
       );
+
     } on FirebaseAuthException catch (e) {
       String msg = 'Login failed. Please try again.';
-      if (e.code == 'user-not-found') msg = 'No account found with this email.';
-      else if (e.code == 'wrong-password') msg = 'Incorrect password. Please try again.';
-      else if (e.code == 'invalid-email') msg = 'The email address is not valid.';
-      else if (e.code == 'user-disabled') msg = 'This account has been disabled.';
+      if (e.code == 'user-not-found') {
+        msg = 'No account found with this email.';
+      } else if (e.code == 'wrong-password') {
+        msg = 'Incorrect password. Please try again.';
+      } else if (e.code == 'invalid-email') {
+        msg = 'The email address is not valid.';
+      } else if (e.code == 'user-disabled') {
+        msg = 'This account has been disabled.';
+      }
       _showErrorDialog(msg);
     } catch (_) {
       _showErrorDialog('An unexpected error occurred. Please try again.');
@@ -82,7 +90,11 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Login Error'),
         content: Text(message),
-        actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK'))],
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'))
+        ],
       ),
     );
   }
@@ -115,7 +127,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   Image.asset('assets/images/meditrace_logo.png', height: 120),
                   const SizedBox(height: 20),
                   const Text('MediTrace',
-                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue)),
+                      style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue)),
                   const SizedBox(height: 8),
                   const Text('Your Personal Medication Manager',
                       style: TextStyle(fontSize: 16, color: Colors.grey)),
@@ -133,7 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: InputDecoration(
                         labelText: 'Email',
                         prefixIcon: const Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10)),
                         filled: true,
                         fillColor: Colors.grey[50],
                       ),
@@ -147,10 +163,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined),
+                          onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword),
                         ),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10)),
                         filled: true,
                         fillColor: Colors.grey[50],
                       ),
@@ -161,9 +181,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: TextButton(
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen()),
                         ),
-                        child: const Text('Forgot Password?', style: TextStyle(color: Colors.blue)),
+                        child: const Text('Forgot Password?',
+                            style: TextStyle(color: Colors.blue)),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -174,11 +196,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ? const CircularProgressIndicator(
+                            color: Colors.white)
+                            : const Text('Login',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -192,9 +219,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const RegisterScreen()),
                     ),
-                    child: const Text('Sign Up', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                    child: const Text('Sign Up',
+                        style: TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
