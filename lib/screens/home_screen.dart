@@ -9,8 +9,10 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
-// ✅ Roboflow service (make sure file is at lib/services/roboflow_service.dart)
+// Roboflow service
 import 'package:meditrace/screens/services/roboflow_service.dart';
+// Local notifications helper
+import 'package:meditrace/screens/services/notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -31,24 +33,24 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _recentHistory = [];
 
   // === Roboflow setup (two models) ===
-  static const String _apiKey = 'l5QBgJv58xaL9eaCh4rq'; // your PRIVATE key
+  static const String _apiKey = 'l5QBgJv58xaL9eaCh4rq';
   static const String _boxModel = 'medicine-box-pcltm/1';
   static const String _counterfeitModel = 'counterfeit_med_detection-tvqcg/1';
 
   late final RoboflowService _rfBox;
   late final RoboflowService _rfCounterfeit;
 
-  // We’ll still keep a base threshold, but decision logic below overrides carefully.
   static const double _baseConf = 0.4;
-
   final TextRecognizer _textRecognizer = TextRecognizer();
+
+  // how many days before expiry to notify
+  static const int _expiryLeadDays = 7;
 
   @override
   void initState() {
     super.initState();
     _rfBox = RoboflowService(apiKey: _apiKey, modelId: _boxModel);
-    _rfCounterfeit =
-        RoboflowService(apiKey: _apiKey, modelId: _counterfeitModel);
+    _rfCounterfeit = RoboflowService(apiKey: _apiKey, modelId: _counterfeitModel);
     _loadRecentHistory();
   }
 
@@ -63,8 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Recent history
   // ------------------------------
   Future<void> _loadRecentHistory() async {
-    final snap =
-    await _dbRef.child(widget.user.uid).child("searchHistory").get();
+    final snap = await _dbRef.child(widget.user.uid).child("searchHistory").get();
     if (!snap.exists) {
       setState(() => _recentHistory = []);
       return;
@@ -126,18 +127,12 @@ class _HomeScreenState extends State<HomeScreen> {
         "name": medicine['openfda']?['brand_name']?[0] ?? query,
         "status": "Genuine",
         "dosage": medicine['dosage_and_administration']?[0] ?? "Unknown",
-        // You said interaction page doesn’t need expiry; we keep a placeholder.
         "expiry": "Not provided",
-        "description":
-        medicine['indications_and_usage']?[0] ?? "No usage info.",
+        "description": medicine['indications_and_usage']?[0] ?? "No usage info.",
         "timestamp": DateTime.now().toIso8601String(),
       };
 
-      await _dbRef
-          .child(widget.user.uid)
-          .child("searchHistory")
-          .push()
-          .set(medicineData);
+      await _dbRef.child(widget.user.uid).child("searchHistory").push().set(medicineData);
 
       _loadRecentHistory();
     } catch (e) {
@@ -162,8 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final file = File(picked.path);
 
       // 1) Counterfeit model
-      final counterfeitRes =
-      await _rfCounterfeit.inferImageFile(file, params: {
+      final counterfeitRes = await _rfCounterfeit.inferImageFile(file, params: {
         "confidence": _baseConf.toString(),
       });
 
@@ -182,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final ocrDetails = _extractOcrDetails(ocrText);
 
-      // 4) Decide authenticity using stricter logic
+      // 4) Decide authenticity
       final status = _decideAuthenticity(counterfeitRes, boxRes);
 
       setState(() => _isAnalyzing = false);
@@ -204,11 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ------------------------------
-  // Authenticity decision (stricter)
-  // Priority:
-  // 1) If ANY model predicts 'counterfeit' with >= 0.40 -> Counterfeit
-  // 2) Else if ANY model predicts 'authentic' with >= 0.60 -> Genuine
-  // 3) Else Not detected
+  // Authenticity decision
   // ------------------------------
   String _decideAuthenticity(
       Map<String, dynamic> counterfeitRes, Map<String, dynamic> boxRes) {
@@ -230,10 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _maxConf(predsB, 'authentic')
     ].reduce((a, b) => a > b ? a : b);
 
-    debugPrint(
-        "DEBUG AUTH: counterfeit=$confCounterfeit, authentic=$confAuthentic");
-
-    if (confCounterfeit >= 0.40) return 'Counterfeit'; // counterfeit wins
+    if (confCounterfeit >= 0.40) return 'Counterfeit';
     if (confAuthentic >= 0.60) return 'Genuine';
     return 'Not detected';
   }
@@ -249,53 +236,32 @@ class _HomeScreenState extends State<HomeScreen> {
         .where((e) => e.isNotEmpty)
         .toList();
 
-    // --- NAME heuristics ---
-    // 1) If we find a known drug family/brand in the text, use it.
+    // NAME
     final knownNames = [
-      // common brands/generics
-      'Paracetamol',
-      'Acetaminophen',
-      'Ibuprofen',
-      'Aspirin',
-      'Naproxen',
-      'Panadol',
-      'Amoxicillin',
-      'Excedrin',
-      'Caffeine',
-      'Loratadine',
-      'Cetirizine',
-      'Dextromethorphan',
-      'Guaifenesin',
-      'Omeprazole',
-      'Loperamide',
+      'Paracetamol','Acetaminophen','Ibuprofen','Aspirin','Naproxen',
+      'Panadol','Amoxicillin','Excedrin','Caffeine','Loratadine',
+      'Cetirizine','Dextromethorphan','Guaifenesin','Omeprazole','Loperamide',
     ];
 
     String name = "Unknown";
     for (final w in knownNames) {
       if (cleaned.toLowerCase().contains(w.toLowerCase())) {
-        name = w;
-        break;
+        name = w; break;
       }
     }
 
-    // 2) If still Unknown, pick a likely BRAND line (mostly uppercase & long).
     if (name == "Unknown") {
       String best = "";
       double bestScore = 0;
       for (final l in lines.take(6)) {
-        // Score by uppercase ratio & length (brand text tends to be like "EXCEDRIN")
         final letters = l.replaceAll(RegExp(r'[^A-Za-z]'), '');
         if (letters.isEmpty) continue;
         final upper = letters.replaceAll(RegExp(r'[^A-Z]'), '');
         final ratio = upper.length / letters.length;
-        final score = ratio * (l.length.clamp(0, 30)); // prefer bold long words
-        if (score > bestScore) {
-          bestScore = score;
-          best = l;
-        }
+        final score = ratio * (l.length.clamp(0, 30));
+        if (score > bestScore) { bestScore = score; best = l; }
       }
       if (bestScore > 8) {
-        // extract a dominant word (strip symbols)
         final bigWord = best
             .split(RegExp(r'\s+'))
             .map((w) => w.replaceAll(RegExp(r'[^A-Za-z0-9\-]'), ''))
@@ -305,30 +271,27 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    // --- DOSAGE (mg/mcg/g/ml and unit count like CAPLETS/TABLETS/CAPSULES) ---
-    // e.g. "500 mg", "500MG", "2ml", "100 CAPLETS", "50 tablets"
+    // DOSAGE
     final dosageRegex = RegExp(
-        r'(\b\d{1,4}\s?(?:mg|mcg|g|ml)\b|\b\d{1,4}\s?(?:tablets?|capsules?|caplets?)\b)',
-        caseSensitive: false);
+      r'(\b\d{1,4}\s?(?:mg|mcg|g|ml)\b|\b\d{1,4}\s?(?:tablets?|capsules?|caplets?)\b)',
+      caseSensitive: false,
+    );
     final dosageMatch = dosageRegex.firstMatch(cleaned);
     final dosage = dosageMatch != null ? dosageMatch.group(0)! : "Not Found";
 
-    // --- EXPIRY ---
-    // Look for a line containing EXP/Expiry/Expire, or typical date patterns.
-    final expiryLine = RegExp(r'\b(?:EXP|Exp|Expiry|Expire)\b[^\n]*')
+    // EXPIRY: try to capture line with EXP/Expiry...
+    final expiryLine = RegExp(r'(?i)\b(EXP|Expiry|Expire|Exp\.)\b[^\n]*')
         .firstMatch(cleaned)
         ?.group(0);
     String expiry = expiryLine ?? "Not Found";
     if (expiry == "Not Found") {
       final dateLike = RegExp(
-          r'\b(0?[1-9]|1[0-2])[/\- ](0?[1-9]|[12]\d|3[01])[/\- ](\d{2,4})\b') // 09/24/2025
+          r'\b(0?[1-9]|1[0-2])[/\- ](0?[1-9]|[12]\d|3[01])[/\- ](\d{2,4})\b')
           .firstMatch(cleaned)
           ?.group(0);
       if (dateLike != null) expiry = "EXP $dateLike";
     }
 
-    // --- DESCRIPTION ---
-    // Compact first 1–2 lines that aren't just headers
     final description = lines.take(2).join(' ');
 
     return {
@@ -424,16 +387,144 @@ class _HomeScreenState extends State<HomeScreen> {
       "timestamp": DateTime.now().toIso8601String(),
     };
 
-    await _dbRef
-        .child(widget.user.uid)
-        .child("searchHistory")
-        .push()
-        .set(record);
+    await _dbRef.child(widget.user.uid).child("searchHistory").push().set(record);
+
+    // If expiry can be parsed to a future date, create an alert and schedule a one-time notification
+    final parsedExpiry = _parseExpiryDate(ocrDetails["expiry"] ?? "");
+    if (parsedExpiry != null && parsedExpiry.isAfter(DateTime.now())) {
+      await _createExpiryAlertAndSchedule(
+        medName: ocrDetails["name"] ?? "Medicine",
+        expiryDate: parsedExpiry,
+      );
+    }
+
     if (!mounted) return;
-    Navigator.of(context).pop(); // close dialog
+    Navigator.of(context).pop();
     _showSnack('Scan saved successfully!');
     _loadRecentHistory();
   }
+
+  // ========= Expiry parsing =========
+
+  int _fixYear(int yy) => yy < 100 ? yy + 2000 : yy;
+
+  DateTime? _lastDayOfMonth(int year, int month) {
+    final firstNext = DateTime(year, month + 1, 1);
+    return firstNext.subtract(const Duration(days: 1));
+  }
+
+  /// Robust parser for common expiry formats:
+  /// - EXP 18FEB2025 / 18 FEB 2025 / 18-FEB-25
+  /// - EXP MAY24 / MAY 2024
+  /// - MM/YYYY, MM/YY
+  /// - DD/MM/YYYY, DD-MM-YYYY
+  /// - MM/DD/YYYY
+  DateTime? _parseExpiryDate(String raw) {
+    if (raw.isEmpty) return null;
+
+    final months = {
+      'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+      'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+    };
+
+    // normalize: remove EXP/Expiry prefix and extra punctuation
+    final t = raw
+        .replaceAll(RegExp(r'(?i)\b(exp|expiry|expire|exp\.)[:\s\-]*'), '')
+        .replaceAll(RegExp(r'[,\.]'), ' ')
+        .trim();
+
+    // 1) DD-MMM-YYYY / DD MMM YYYY / DDMMMYYYY
+    final m5 = RegExp(r'^\s*(\d{1,2})\s*([A-Za-z]{3,})\s*(\d{2,4})\s*$').firstMatch(t);
+    if (m5 != null) {
+      final dd = int.parse(m5.group(1)!);
+      final monStr = m5.group(2)!.substring(0, 3).toLowerCase();
+      final mon = months[monStr];
+      if (mon != null) {
+        var yy = int.parse(m5.group(3)!);
+        yy = _fixYear(yy);
+        return DateTime(yy, mon, dd, 23, 59);
+      }
+    }
+
+    // 2) MMM-YYYY / MMM YYYY / MMMYY (use last day of month)
+    final m3 = RegExp(r'^\s*([A-Za-z]{3,})\s*(\d{2,4})\s*$').firstMatch(t);
+    if (m3 != null) {
+      final monStr = m3.group(1)!.substring(0, 3).toLowerCase();
+      final mon = months[monStr];
+      if (mon != null) {
+        var yy = int.parse(m3.group(2)!);
+        yy = _fixYear(yy);
+        final last = _lastDayOfMonth(yy, mon)!;
+        return DateTime(yy, mon, last.day, 23, 59);
+      }
+    }
+
+    // 3) MM/YYYY or MM-YYYY or MM YY
+    final m1 = RegExp(r'^\s*(0?[1-9]|1[0-2])[\-\/ ](\d{2,4})\s*$').firstMatch(t);
+    if (m1 != null) {
+      final mm = int.parse(m1.group(1)!);
+      var yy = int.parse(m1.group(2)!);
+      yy = _fixYear(yy);
+      final last = _lastDayOfMonth(yy, mm)!;
+      return DateTime(yy, mm, last.day, 23, 59);
+    }
+
+    // 4) DD/MM/YYYY or DD-MM-YYYY
+    final m2 = RegExp(r'^\s*(\d{1,2})[\/\- ](0?[1-9]|1[0-2])[\/\- ](\d{2,4})\s*$').firstMatch(t);
+    if (m2 != null) {
+      final dd = int.parse(m2.group(1)!);
+      final mm = int.parse(m2.group(2)!);
+      var yy = int.parse(m2.group(3)!);
+      yy = _fixYear(yy);
+      return DateTime(yy, mm, dd, 23, 59);
+    }
+
+    // 5) MM/DD/YYYY
+    final m4 = RegExp(r'^\s*(0?[1-9]|1[0-2])[\/\- ](0?[1-9]|[12]\d|3[01])[\/\- ](\d{4})\s*$')
+        .firstMatch(t);
+    if (m4 != null) {
+      final mm = int.parse(m4.group(1)!);
+      final dd = int.parse(m4.group(2)!);
+      final yy = int.parse(m4.group(3)!);
+      return DateTime(yy, mm, dd, 23, 59);
+    }
+
+    return null;
+  }
+
+  Future<void> _createExpiryAlertAndSchedule({
+    required String medName,
+    required DateTime expiryDate,
+  }) async {
+    final uid = widget.user.uid;
+    final alertsRef = _dbRef.child(uid).child('expiryAlerts');
+
+    final alertDate = expiryDate.subtract(Duration(days: _expiryLeadDays));
+    if (alertDate.isAfter(DateTime.now())) {
+      // write to DB
+      final ref = alertsRef.push();
+      final data = {
+        "medicine": medName,
+        "expiryIso": expiryDate.toIso8601String(),
+        "alertIso": alertDate.toIso8601String(),
+        "leadDays": _expiryLeadDays,
+        "createdAt": DateTime.now().toIso8601String(),
+        "notified": false,
+      };
+      await ref.set(data);
+
+      // schedule local notification (one-time)
+      await NotificationService.scheduleOneTimeNotification(
+        id: ref.key!.hashCode,
+        title: "Expiry Alert",
+        body: "$medName is expiring in $_expiryLeadDays days (on ${_fmt(expiryDate)}).",
+        dateTime: alertDate,
+      );
+    }
+  }
+
+  String _fmt(DateTime d) =>
+      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
 
   // -------------------
   // Helpers
@@ -464,8 +555,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child:
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Search Bar (FDA)
           Container(
             decoration: BoxDecoration(
@@ -489,8 +579,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.close, color: Colors.grey),
                   onPressed: () => _searchController.clear(),
                 ),
-                contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16.0),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
               ),
             ),
           ),
@@ -556,8 +645,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Recent Activity',
-                  style:
-                  TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/history'),
                   child: const Text("View All")),
@@ -607,8 +695,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text("Status: ${item['status']}"),
                       Text("Dosage: ${item['dosage']}"),
                       Text("Expiry: ${item['expiry']}"),
-                      if ((item['description'] as String?)?.isNotEmpty ??
-                          false)
+                      if ((item['description'] as String?)?.isNotEmpty ?? false)
                         Text("Description: ${item['description']}"),
                     ],
                   ),

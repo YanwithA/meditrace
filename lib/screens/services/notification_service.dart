@@ -1,109 +1,108 @@
-import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tzdata;
 
-/// One shared instance
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin _plugin =
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
   FlutterLocalNotificationsPlugin();
 
-  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'meditrace_reminders',
-    'MediTrace Reminders',
-    description: 'Scheduled medication reminders',
-    importance: Importance.max,
-  );
-
-  /// Call this once in main() *before* runApp
   static Future<void> init() async {
-    // Timezone init
     tzdata.initializeTimeZones();
-    // Use device local timezone
-    final String localName = DateTime.now().timeZoneName;
-    // Fallback to local if tz can't resolve (rare)
-    tz.setLocalLocation(
-      tz.getLocation(tz.timeZoneDatabase.locations.keys.contains(localName)
-          ? localName
-          : 'UTC'),
-    );
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iOSInit = DarwinInitializationSettings();
-    const init = InitializationSettings(android: androidInit, iOS: iOSInit);
 
-    await _plugin.initialize(init);
+    const initSettings =
+    InitializationSettings(android: androidInit, iOS: iOSInit);
 
-    // Android 13+ runtime permission
-    if (Platform.isAndroid) {
-      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      await androidImpl?.createNotificationChannel(_channel);
-      await androidImpl?.requestNotificationsPermission();
-    } else if (Platform.isIOS) {
-      await _plugin
-          .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(alert: true, badge: true, sound: true);
-    }
+    await _notificationsPlugin.initialize(initSettings);
   }
 
-  /// Schedule a weekly notification for a given weekday (1=Mon..7=Sun)
-  /// `time` provides hour/minute; we compute the next instance.
+  /// Weekly notification (already used in your reminders)
   static Future<void> scheduleWeeklyNotification({
     required int id,
     required String title,
     required String body,
-    required int weekday,
+    required int weekday, // 1=Mon..7=Sun
     required DateTime time,
   }) async {
-    final next = _nextInstanceOfWeekday(
-      weekday,
-      hour: time.hour,
-      minute: time.minute,
-    );
-
-    await _plugin.zonedSchedule(
+    await _notificationsPlugin.zonedSchedule(
       id,
       title,
       body,
-      next,
-      NotificationDetails(
+      _nextInstanceOfWeekday(weekday, time),
+      const NotificationDetails(
         android: AndroidNotificationDetails(
-          _channel.id,
-          _channel.name,
-          channelDescription: _channel.description,
+          'weekly_channel',
+          'Weekly Reminders',
+          channelDescription: 'Weekly medicine reminders',
           importance: Importance.max,
           priority: Priority.high,
         ),
-        iOS: const DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.wallClockTime,
+      UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
     );
   }
 
-  static tz.TZDateTime _nextInstanceOfWeekday(int weekday,
-      {required int hour, required int minute}) {
-    // weekday: 1=Mon..7=Sun
+  static tz.TZDateTime _nextInstanceOfWeekday(int weekday, DateTime time) {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled =
-    tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
-
-    // Move forward to correct weekday if needed
-    while (scheduled.weekday != weekday || !scheduled.isAfter(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
-      scheduled = tz.TZDateTime(
-          tz.local, scheduled.year, scheduled.month, scheduled.day, hour, minute);
+    var scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
+    );
+    while (scheduledDate.weekday != weekday) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
-    return scheduled;
-    // With matchDateTimeComponents: dayOfWeekAndTime, it will repeat weekly
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 7));
+    }
+    return scheduledDate;
   }
 
-  static Future<void> cancelNotification(int id) =>
-      _plugin.cancel(id);
+  /// ❗ NEW: One-time notification (for expiry alerts)
+  static Future<void> scheduleOneTimeNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime dateTime,
+  }) async {
+    final tzTime = tz.TZDateTime.from(dateTime, tz.local);
 
-  static Future<void> cancelAll() => _plugin.cancelAll();
+    await _notificationsPlugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tzTime,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'expiry_channel',
+          'Expiry Alerts',
+          channelDescription: 'Medicine expiry alerts',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+      UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: null,
+    );
+  }
+
+  /// Cancel a notification by ID
+  static Future<void> cancelNotification(int id) async {
+    await _notificationsPlugin.cancel(id);
+  }
+
+  /// Cancel all notifications
+  static Future<void> cancelAll() async {
+    await _notificationsPlugin.cancelAll();
+  }
 }
