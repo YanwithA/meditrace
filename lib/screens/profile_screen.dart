@@ -23,7 +23,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final DatabaseReference _historyRef;
   Stream<DatabaseEvent>? _historyStream;
 
-  // Track which medicine names are expanded
   Set<String> _expandedNames = {};
 
   @override
@@ -73,7 +72,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final Map<String, int> counts = {};
 
       for (final entry in history.values) {
-        // ONLY include FDA searches
         if ((entry['source'] ?? '') != 'FDA') continue;
         final name = entry['name'] ?? 'Unknown';
         counts[name] = (counts[name] ?? 0) + 1;
@@ -88,7 +86,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final Map<String, double> percentages =
       counts.map((key, value) => MapEntry(key, value / total * 100));
 
-      // Sort descending by percentage
       final sortedEntries = percentages.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
       final top5 = Map<String, double>.fromEntries(sortedEntries.take(5));
@@ -125,63 +122,116 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Widget _buildProfileCard({
+    required Widget child,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 16),
             const Text(
-              "Profile Page",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              "Profile",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 24),
+
+            // Username Card
+            _buildProfileCard(
+              child: Row(
+                children: [
+                  const Icon(Icons.person, color: Colors.blue),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(
+                        labelText: "Username",
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.save, color: Colors.green),
+                    onPressed: _updateUsername,
+                  ),
+                ],
+              ),
+            ),
+
+            // Email Card
+            _buildProfileCard(
+              child: Row(
+                children: [
+                  const Icon(Icons.email, color: Colors.blue),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _profileData?["email"] ?? "N/A",
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Age Card
+            _buildProfileCard(
+              child: Row(
+                children: [
+                  const Icon(Icons.cake, color: Colors.blue),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _ageController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Age",
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.save, color: Colors.green),
+                    onPressed: _updateAge,
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 20),
-
-            // Username
-            ListTile(
-              title: TextField(
-                controller: _usernameController,
-                decoration: const InputDecoration(labelText: "Username"),
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.save),
-                onPressed: _updateUsername,
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _logout,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text("Logout"),
               ),
             ),
 
-            // Email
-            ListTile(
-              title: Text("Email: ${_profileData?["email"] ?? "N/A"}"),
-            ),
-
-            // Age
-            ListTile(
-              title: TextField(
-                controller: _ageController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Age"),
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.save),
-                onPressed: _updateAge,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _logout,
-              child: const Text("Logout"),
-            ),
-
-            const Divider(thickness: 2),
-            const SizedBox(height: 20),
+            const Divider(thickness: 2, height: 40),
 
             // Search Analytics
             const Text(
@@ -196,7 +246,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: _analyticsData.entries.map((e) {
                 final isExpanded = _expandedNames.contains(e.key);
-
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: Row(
@@ -253,8 +302,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }).toList(),
             ),
+
+            const SizedBox(height: 30),
+            const Divider(thickness: 2),
+            const SizedBox(height: 10),
+
+            // FAQ Section
+            const Text(
+              "FAQs",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            const FAQTile(
+              question: "What does the Search Analytics show?",
+              answer:
+              "It shows your top 5 most searched medicines from the FDA database along with their percentage of total searches.",
+            ),
+            const FAQTile(
+              question: "Why is some medicine not appearing?",
+              answer:
+              "Only searches done through the FDA search feature are counted. If you searched elsewhere, it won't appear here.",
+            ),
+            const FAQTile(
+              question: "Can I rely on this for medical advice?",
+              answer:
+              "⚠️ No. This is only for personal tracking and analytics. Always consult a doctor or pharmacist before making medication decisions.",
+            ),
+            const FAQTile(
+              question: "How is the percentage calculated?",
+              answer:
+              "The percentage represents how often a medicine was searched relative to your total FDA searches.",
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class FAQTile extends StatefulWidget {
+  final String question;
+  final String answer;
+
+  const FAQTile({super.key, required this.question, required this.answer});
+
+  @override
+  State<FAQTile> createState() => _FAQTileState();
+}
+
+class _FAQTileState extends State<FAQTile> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ExpansionTile(
+        title: Text(
+          widget.question,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text(widget.answer),
+          ),
+        ],
+        initiallyExpanded: _expanded,
+        onExpansionChanged: (val) {
+          setState(() => _expanded = val);
+        },
       ),
     );
   }

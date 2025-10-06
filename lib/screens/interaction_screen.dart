@@ -1,260 +1,245 @@
+// lib/screens/interaction_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class InteractionScreen extends StatefulWidget {
-  const InteractionScreen({super.key});
+  const InteractionScreen({Key? key}) : super(key: key);
 
   @override
   State<InteractionScreen> createState() => _InteractionScreenState();
 }
 
 class _InteractionScreenState extends State<InteractionScreen> {
-  final TextEditingController _drug1Controller = TextEditingController();
-  final TextEditingController _drug2Controller = TextEditingController();
+  final TextEditingController _drugAController = TextEditingController();
+  final TextEditingController _drugBController = TextEditingController();
 
-  String? _severity;
-  String? _description;
+  Map<String, dynamic>? _drugAData;
+  Map<String, dynamic>? _drugBData;
+  String _resultMessage = "";
+  bool _loading = false;
 
-  ///interactions map
-  final Map<String, Map<String, Map<String, String>>> interactions = {
-    "aspirin": {
-      "ibuprofen": {
-        "severity": "Moderate",
-        "description":
-        "Ibuprofen may reduce the cardioprotective antiplatelet effect of aspirin, especially if taken before aspirin. This could decrease aspirin’s effectiveness in preventing heart attack or stroke."
-      },
-      "warfarin": {
-        "severity": "High",
-        "description":
-        "Both aspirin and warfarin thin the blood. When taken together, they greatly increase the risk of severe bleeding (gastrointestinal or intracranial). This combination should be used only under strict medical supervision."
-      },
-      "clopidogrel": {
-        "severity": "High",
-        "description":
-        "Aspirin plus clopidogrel significantly increases bleeding risk. While sometimes prescribed together for heart conditions, this requires close monitoring by a doctor."
-      }
-    },
-    "warfarin": {
-      "ibuprofen": {
-        "severity": "High",
-        "description":
-        "NSAIDs like ibuprofen can cause stomach ulcers and bleeding. Combining with warfarin increases bleeding risk even further, including life-threatening internal bleeding."
-      },
-      "paracetamol": {
-        "severity": "Low",
-        "description":
-        "Occasional paracetamol (acetaminophen) use is usually safe with warfarin, but regular or high doses may increase warfarin’s effect, raising bleeding risk. INR monitoring may be needed."
-      },
-      "amiodarone": {
-        "severity": "High",
-        "description":
-        "Amiodarone can strongly increase warfarin’s blood-thinning effect, raising the risk of major bleeding. Dose adjustment and close INR monitoring are required."
-      }
-    },
-    "ibuprofen": {
-      "paracetamol": {
-        "severity": "Low",
-        "description":
-        "Ibuprofen and paracetamol are often used together safely for short-term pain relief. However, excessive use of either drug can cause liver (paracetamol) or kidney/stomach (ibuprofen) damage."
-      },
-      "prednisone": {
-        "severity": "Moderate",
-        "description":
-        "Both ibuprofen and corticosteroids (like prednisone) can irritate the stomach lining. Using them together raises the risk of stomach ulcers or bleeding."
-      }
-    },
-    "clopidogrel": {
-      "omeprazole": {
-        "severity": "Moderate",
-        "description":
-        "Omeprazole may reduce the effectiveness of clopidogrel by blocking its activation in the liver, lowering its ability to prevent clots. Alternative acid reducers (like pantoprazole) are preferred."
-      }
-    },
-    "metformin": {
-      "alcohol": {
-        "severity": "High",
-        "description":
-        "Heavy alcohol use while on metformin increases the risk of lactic acidosis, a rare but potentially fatal condition. Avoid excessive drinking while taking metformin."
-      }
-    },
-    "lisinopril": {
-      "potassium": {
-        "severity": "High",
-        "description":
-        "ACE inhibitors like lisinopril can raise potassium levels. Taking potassium supplements or salt substitutes may lead to dangerous hyperkalemia (irregular heartbeat, cardiac arrest)."
-      },
-      "ibuprofen": {
-        "severity": "Moderate",
-        "description":
-        "Ibuprofen can reduce the blood-pressure-lowering effect of lisinopril and may worsen kidney function when combined, especially in older adults or those with kidney disease."
-      }
-    },
-    "statins": {
-      "grapefruit": {
-        "severity": "Moderate",
-        "description":
-        "Grapefruit juice can increase the blood level of certain statins (simvastatin, atorvastatin), raising the risk of liver damage and muscle breakdown (rhabdomyolysis)."
-      }
-    }
-  };
+  Future<void> _checkInteraction() async {
+    final drugA = _drugAController.text.trim();
+    final drugB = _drugBController.text.trim();
 
-
-  void _checkInteraction() {
-    final drug1 = _drug1Controller.text.trim().toLowerCase();
-    final drug2 = _drug2Controller.text.trim().toLowerCase();
-
-    setState(() {
-      _severity = null;
-      _description = null;
-    });
-
-    if (drug1.isEmpty || drug2.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Please enter both medicines")),
-      );
+    if (drugA.isEmpty || drugB.isEmpty) {
+      setState(() => _resultMessage = "⚠️ Please enter both medicine names.");
       return;
     }
 
-    // Look for drug1 -> drug2
-    if (interactions.containsKey(drug1) &&
-        interactions[drug1]!.containsKey(drug2)) {
-      setState(() {
-        _severity = interactions[drug1]![drug2]!["severity"];
-        _description = interactions[drug1]![drug2]!["description"];
-      });
-    }
-    // Look for drug2 -> drug1
-    else if (interactions.containsKey(drug2) &&
-        interactions[drug2]!.containsKey(drug1)) {
-      setState(() {
-        _severity = interactions[drug2]![drug1]!["severity"];
-        _description = interactions[drug2]![drug1]!["description"];
-      });
-    } else {
-      setState(() {
-        _severity = "Unknown";
-        _description = "No major interaction found in database.";
-      });
+    setState(() {
+      _loading = true;
+      _resultMessage = "";
+      _drugAData = null;
+      _drugBData = null;
+    });
+
+    try {
+      final urlA =
+          "https://api.fda.gov/drug/label.json?search=openfda.brand_name:${Uri.encodeComponent(drugA)}&limit=1";
+      final urlB =
+          "https://api.fda.gov/drug/label.json?search=openfda.brand_name:${Uri.encodeComponent(drugB)}&limit=1";
+
+      final resA = await http.get(Uri.parse(urlA));
+      final resB = await http.get(Uri.parse(urlB));
+
+      if (resA.statusCode != 200 || resB.statusCode != 200) {
+        setState(() => _resultMessage =
+        "❌ FDA API error: ${resA.statusCode} / ${resB.statusCode}");
+        return;
+      }
+
+      final dataA = json.decode(resA.body);
+      final dataB = json.decode(resB.body);
+
+      if ((dataA['results'] as List).isEmpty ||
+          (dataB['results'] as List).isEmpty) {
+        setState(() =>
+        _resultMessage = "⚠️ Could not find information for one or both drugs.");
+        return;
+      }
+
+      _drugAData = _extractDrugInfo(dataA['results'][0], drugA);
+      _drugBData = _extractDrugInfo(dataB['results'][0], drugB);
+
+      setState(() => _resultMessage =
+      "⚠️ This information is not a substitute for professional medical advice. Please consult a doctor or pharmacist.");
+    } catch (e) {
+      setState(() => _resultMessage = "❌ Request failed: $e");
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
-  Color _getSeverityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case "high":
-        return Colors.red;
-      case "moderate":
-        return Colors.orange;
-      case "low":
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
+  Map<String, dynamic> _extractDrugInfo(Map<String, dynamic> raw, String name) {
+    String joinList(List<dynamic>? list) =>
+        (list ?? []).map((e) => e.toString()).join("\n");
+
+    return {
+      "name": name,
+      "warnings": joinList(raw['warnings']),
+      "adverse_reactions": joinList(raw['adverse_reactions']),
+      "drug_interactions": joinList(raw['drug_interactions']),
+    };
+  }
+
+  Widget _buildDrugSection(String title, Map<String, dynamic>? data) {
+    if (data == null) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style:
+              const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _collapsibleText("Warnings", data["warnings"]),
+          const SizedBox(height: 6),
+          _collapsibleText("Adverse Reactions", data["adverse_reactions"]),
+          const SizedBox(height: 6),
+          _collapsibleText("Drug Interactions", data["drug_interactions"]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _collapsibleText(String header, String content) {
+    if (content.isEmpty) return const SizedBox.shrink();
+    return ExpansionTile(
+      title: Text(header,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 12, bottom: 8),
+          child: Text(content),
+        ),
+      ],
+    );
+  }
+
+  void _startOver() {
+    _drugAController.clear();
+    _drugBController.clear();
+    setState(() {
+      _drugAData = null;
+      _drugBData = null;
+      _resultMessage = "";
+    });
+  }
+
+  @override
+  void dispose() {
+    _drugAController.dispose();
+    _drugBController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Drug Interaction Checker"),
-        backgroundColor: const Color(0xFF2E86AB),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Enter two medicines to check interactions",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-
-              // Drug 1
-              TextField(
-                controller: _drug1Controller,
-                decoration: InputDecoration(
-                  labelText: "First Medicine",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+      appBar: AppBar(title: const Text("Drug Interaction Checker")),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Drug A input with delete button
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _drugAController,
+                    decoration: const InputDecoration(
+                      labelText: "First Medicine",
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                  prefixIcon: const Icon(Icons.medication),
                 ),
-              ),
-              const SizedBox(height: 16),
+                IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _drugAController.clear();
+                    setState(() => _drugAData = null);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
 
-              // Drug 2
-              TextField(
-                controller: _drug2Controller,
-                decoration: InputDecoration(
-                  labelText: "Second Medicine",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Drug B input with delete button
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _drugBController,
+                    decoration: const InputDecoration(
+                      labelText: "Second Medicine",
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                  prefixIcon: const Icon(Icons.medical_services),
                 ),
-              ),
-              const SizedBox(height: 20),
+                IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _drugBController.clear();
+                    setState(() => _drugBData = null);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-              // Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _checkInteraction,
-                  icon: const Icon(Icons.search),
-                  label: const Text("Check Interaction"),
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _checkInteraction,
+                    child: _loading
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                        : const Text("Check Interaction"),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _startOver,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E86AB),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: Colors.grey,
                   ),
+                  child: const Text("Start Over"),
                 ),
-              ),
-              const SizedBox(height: 20),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-              // Results
-              if (_severity != null && _description != null)
-                Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.warning,
-                            color: _getSeverityColor(_severity!),
-                            size: 36),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Severity: $_severity",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: _getSeverityColor(_severity!),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _description!,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
+            // Result message
+            if (_resultMessage.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.yellow[100],
+                  borderRadius: BorderRadius.circular(12),
                 ),
-            ],
-          ),
+                child: Text(_resultMessage),
+              ),
+            const SizedBox(height: 12),
+
+            // Drug info sections
+            _buildDrugSection("Drug A", _drugAData),
+            _buildDrugSection("Drug B", _drugBData),
+          ],
         ),
       ),
     );

@@ -3,14 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// Services
 import 'package:meditrace/screens/services/roboflow_service.dart';
 import 'package:meditrace/screens/services/notification_service.dart';
 
-// Auth
+// Auth screens
 import 'package:meditrace/screens/auth/login_screen.dart';
 import 'package:meditrace/screens/auth/register_screen.dart';
 
-// Feature screens (use aliases + show only the widgets you need)
+// Feature screens (use aliases to avoid naming conflicts)
 import 'package:meditrace/screens/home_screen.dart' as home show HomeScreen;
 import 'package:meditrace/screens/history_screen.dart' as history show HistoryScreen;
 import 'package:meditrace/screens/interaction_screen.dart' as interact show InteractionScreen;
@@ -18,16 +19,19 @@ import 'package:meditrace/screens/pharmacy_screen.dart' as pharmacy show Pharmac
 import 'package:meditrace/screens/profile_screen.dart' as profile show ProfileScreen;
 import 'package:meditrace/screens/notification_screen.dart' as notify show NotificationScreen;
 
-// Optional: global roboflow client if you actually use it app-wide
+// Optional: Roboflow client
 final roboflow = RoboflowService(
   apiKey: 'l5QBgJv58xaL9eaCh4rq',
   modelId: 'medicine-box/1',
 );
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+
   await Firebase.initializeApp();
   await NotificationService.init();
+
   runApp(const MediTraceApp());
 }
 
@@ -64,7 +68,9 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         if (snapshot.hasData && snapshot.data != null) {
           return MainWrapper(user: snapshot.data!);
@@ -91,7 +97,6 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   void initState() {
     super.initState();
-
     _screens = <Widget>[
       home.HomeScreen(user: widget.user),
       const notify.NotificationScreen(),
