@@ -145,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // =========================
-  // FDA Search (optional)
+  // FDA Search
   // =========================
   Future<void> _searchMedicine(String query) async {
     if (query.trim().isEmpty) return;
@@ -170,11 +170,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final medicineData = {
         "name": medicine['openfda']?['brand_name']?[0] ?? query,
         "status": "Genuine",
-        "dosage":
-        medicine['dosage_and_administration']?[0] ?? "Unknown",
+        "dosage": "Refer to professionals",
         "expiry": "Not provided",
-        "description":
-        medicine['indications_and_usage']?[0] ?? "No usage info.",
+        "description": medicine['indications_and_usage']?[0] ?? "No usage info.",
+        "source": "FDA",
         "timestamp": DateTime.now().toIso8601String(),
       };
 
