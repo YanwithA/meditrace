@@ -18,7 +18,7 @@ import 'package:meditrace/screens/pharmacy_screen.dart' as pharmacy show Pharmac
 import 'package:meditrace/screens/profile_screen.dart' as profile show ProfileScreen;
 import 'package:meditrace/screens/notification_screen.dart' as notify show NotificationScreen;
 
-// Optional: Roboflow client
+//Roboflow client
 final roboflow = RoboflowService(
   apiKey: 'l5QBgJv58xaL9eaCh4rq',
   modelId: 'medicine-box/1',
@@ -98,7 +98,7 @@ class _MainWrapperState extends State<MainWrapper> {
     _screens = <Widget>[
       home.HomeScreen(user: widget.user),
       const notify.NotificationScreen(),
-      const interact.InteractionScreen(),
+      interact.InteractionScreen(),
       const pharmacy.PharmacyScreen(),
       profile.ProfileScreen(user: widget.user),
     ];
@@ -115,7 +115,7 @@ class _MainWrapperState extends State<MainWrapper> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications_none), label: 'Notification'),
-          BottomNavigationBarItem(icon: Icon(Icons.mediation), label: 'Interaction'),
+          BottomNavigationBarItem(icon: Icon(Icons.mediation), label: 'Checker'),
           BottomNavigationBarItem(icon: Icon(Icons.local_pharmacy), label: 'Pharmacy'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],

@@ -1,4 +1,3 @@
-// lib/services/notification_service.dart
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -28,35 +27,12 @@ class NotificationService {
         ?.requestNotificationsPermission();
   }
 
-  /// Show a notification immediately (no scheduling) — for testing.
-  static Future<void> showNow({
-    required int id,
-    required String title,
-    required String body,
-  }) async {
-    await _notificationsPlugin.show(
-      id,
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'test_channel',
-          'Test Notifications',
-          channelDescription: 'Immediate test notifications',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(),
-      ),
-    );
-  }
-
-  /// Schedule a weekly notification (fires today if time is still ahead).
+  /// Schedule a weekly notification (fires today if time is still ahead)
   static Future<void> scheduleWeeklyNotification({
     required int id,
     required String title,
     required String body,
-    required int weekday, // 1=Mon..7=Sun
+    required int weekday,
     required DateTime time,
   }) async {
     final tzDate = nextInstanceOfWeekday(weekday, time);
@@ -83,8 +59,7 @@ class NotificationService {
     );
   }
 
-  /// Compute next occurrence of a weekday & time in local tz.
-  /// Fires today if the time is still in the future; otherwise next week.
+  /// Compute next occurrence of weekday/time in local tz
   static tz.TZDateTime nextInstanceOfWeekday(int weekday, DateTime time) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
@@ -105,7 +80,7 @@ class NotificationService {
     return scheduledDate;
   }
 
-  /// One-time notification (used for expiry alerts and one-off tests)
+  /// One-time notification
   static Future<void> scheduleOneTimeNotification({
     required int id,
     required String title,
@@ -135,7 +110,48 @@ class NotificationService {
     );
   }
 
-  /// Cancel a notification by its ID
+  /// 🔔 Daily countdown until expiry — schedules only today's notification
+  static Future<void> scheduleDailyCountdownNotification({
+    required int idBase,
+    required String medicineName,
+    required DateTime expiryDate,
+  }) async {
+    final now = DateTime.now();
+    final daysLeft = expiryDate.difference(now).inDays;
+
+    if (daysLeft < 0) return; // already expired
+
+    final title = "Expiry Reminder";
+    final body = daysLeft == 0
+        ? "⚠️ $medicineName has expired today!"
+        : "⏳ $medicineName expires in $daysLeft day${daysLeft > 1 ? 's' : ''}";
+
+    // Schedule only ONE notification for today at 9 AM
+    final nextNotifyTime = DateTime(now.year, now.month, now.day, 9, 0);
+    //final nextNotifyTime = now.add(const Duration(seconds: 10)); // triggers in 10s
+
+    await _notificationsPlugin.zonedSchedule(
+      idBase,
+      title,
+      body,
+      tz.TZDateTime.from(nextNotifyTime, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'expiry_countdown_channel',
+          'Expiry Countdown Alerts',
+          channelDescription: 'Daily countdown until medicine expiry',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+      UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  /// Cancel a specific notification
   static Future<void> cancelNotification(int id) async {
     await _notificationsPlugin.cancel(id);
   }

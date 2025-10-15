@@ -142,7 +142,7 @@ class _InteractionScreenState extends State<InteractionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Drug Interaction Checker")),
+      appBar: AppBar(title: const Text("Medication Side Effects Checker")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -208,7 +208,7 @@ class _InteractionScreenState extends State<InteractionScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                        : const Text("Check Interaction"),
+                        : const Text("Check"),
                   ),
                 ),
                 const SizedBox(width: 12),

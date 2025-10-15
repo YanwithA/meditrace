@@ -1,9 +1,7 @@
-// lib/screens/notification_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-
 import 'package:meditrace/screens/services/notification_service.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -17,15 +15,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseDatabase.instance.ref();
 
-  // ===== Expiry alerts =====
   StreamSubscription<DatabaseEvent>? _alertsSub;
   List<Map<String, dynamic>> _alerts = [];
 
-  // ===== Reminders =====
   StreamSubscription<DatabaseEvent>? _remSub;
   final _titleController = TextEditingController();
   TimeOfDay? _pickedTime;
-  final List<int> _selectedDays = []; // 1..7  (Mon=1 ... Sun=7)
+  final List<int> _selectedDays = [];
   List<Map<String, dynamic>> _reminders = [];
 
   static const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -73,6 +69,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
           'notified': m['notified'] == true,
           'createdAt': (m['createdAt'] ?? '').toString(),
         });
+
+        // ✅ Schedule countdown notifications
+        final expiryIso = (m['expiryIso'] ?? '').toString();
+        final med = (m['medicine'] ?? '').toString();
+        final expiry = DateTime.tryParse(expiryIso);
+        if (expiry != null) {
+          NotificationService.scheduleDailyCountdownNotification(
+            idBase: key.hashCode,
+            medicineName: med,
+            expiryDate: expiry,
+          );
+        }
       });
 
       list.sort((a, b) {
@@ -88,7 +96,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Future<void> _deleteAlert(String key) async {
     final user = _auth.currentUser;
     if (user == null) return;
+
     await _db.child("users/${user.uid}/expiryAlerts/$key").remove();
+
+    final baseId = key.hashCode;
+    for (int i = 0; i < 30; i++) {
+      await NotificationService.cancelNotification(baseId + i);
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Alert deleted")),
@@ -121,9 +136,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
         list.add({
           'key': key,
-          'notifBaseId': key.hashCode, // <-- use consistent base ID everywhere
+          'notifBaseId': key.hashCode,
           'title': (m['title'] ?? '').toString(),
-          'time': (m['time'] ?? '').toString(), // "HH:mm"
+          'time': (m['time'] ?? '').toString(),
           'days': days,
           'enabled': m['enabled'] == true,
         });
@@ -133,7 +148,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     });
   }
 
-  /// Add new reminder (schedules weekly AND a one-time "fire today" if applicable)
   Future<void> _addReminder() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -163,11 +177,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final now = DateTime.now();
 
     for (final d in _selectedDays) {
-      // One-time “today” (if still ahead)
       final next = NotificationService.nextInstanceOfWeekday(
         d,
         DateTime(now.year, now.month, now.day, _pickedTime!.hour, _pickedTime!.minute),
       );
+
       await NotificationService.scheduleOneTimeNotification(
         id: baseId + d + 100000,
         title: "MediTrace Reminder",
@@ -175,7 +189,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         dateTime: DateTime(next.year, next.month, next.day, next.hour, next.minute),
       );
 
-      // Weekly repeating
       await NotificationService.scheduleWeeklyNotification(
         id: baseId + d,
         title: "MediTrace Reminder",
@@ -196,7 +209,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-
   Future<void> _toggleReminder({
     required String key,
     required Map<String, dynamic> reminder,
@@ -209,21 +221,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     final baseId = key.hashCode;
     final days = ((reminder['days'] as List?) ?? const []).map((e) => (e as num).toInt()).toList();
-    final timeStr = (reminder['time'] ?? '').toString(); // "HH:mm"
+    final timeStr = (reminder['time'] ?? '').toString();
     final parts = timeStr.split(':');
     final hour = int.tryParse(parts[0]) ?? 9;
     final minute = int.tryParse(parts[1]) ?? 0;
 
     if (!enable) {
-      // Cancel all scheduled notifications for this reminder
       for (final d in days) {
         await NotificationService.cancelNotification(baseId + d);
       }
-      await NotificationService.cancelNotification(baseId + 999); // cancel the one-time "today"
+      await NotificationService.cancelNotification(baseId + 999);
       return;
     }
 
-    // Re-schedule weekly
     final now = DateTime.now();
     for (final d in days) {
       await NotificationService.scheduleWeeklyNotification(
@@ -235,7 +245,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
       );
     }
 
-    // Re-schedule a one-time "today" if applicable
     final todayWk = DateTime.now().weekday;
     if (days.contains(todayWk)) {
       final todayAt = DateTime(now.year, now.month, now.day, hour, minute);
@@ -255,7 +264,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (user == null) return;
 
     final baseId = key.hashCode;
-
     await _db.child("users/${user.uid}/reminders/$key").remove();
 
     for (final d in days) {
@@ -270,7 +278,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  // ---------------- Helpers ----------------
+  // ---------------- UI Helpers ----------------
   Color _expiryColor(DateTime expiry) {
     final now = DateTime.now();
     final d = expiry.difference(now).inDays;
@@ -291,11 +299,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (picked != null) setState(() => _pickedTime = picked);
   }
 
+  // ---------------- UI Build ----------------
   @override
   Widget build(BuildContext context) {
-    final timeLabel = _pickedTime == null
-        ? "No time selected"
-        : "Time: ${_pickedTime!.format(context)}";
+    final timeLabel =
+    _pickedTime == null ? "No time selected" : "Time: ${_pickedTime!.format(context)}";
 
     return Scaffold(
       appBar: AppBar(title: const Text("Notifications & Reminders")),
@@ -313,26 +321,29 @@ class _NotificationScreenState extends State<NotificationScreen> {
               children: _alerts.map((a) {
                 final med = a["medicine"] ?? "Medicine";
                 final expiryIso = (a["expiryIso"] ?? '').toString();
-                final alertIso = (a["alertIso"] ?? '').toString();
-
                 final expiry = DateTime.tryParse(expiryIso);
-                final alert = DateTime.tryParse(alertIso);
                 final color = expiry != null ? _expiryColor(expiry) : Colors.grey;
-
                 final expiryStr = expiry != null ? _fmt(expiry) : "(unknown)";
-                final subtitle = StringBuffer("Expires: $expiryStr");
-                if (alert != null) {
-                  final isPast = alert.isBefore(DateTime.now());
-                  subtitle.write(isPast
-                      ? " • Alert date passed"
-                      : " • Alert on ${_fmt(alert)}");
+
+                int daysLeft = 0;
+                if (expiry != null) {
+                  daysLeft = expiry.difference(DateTime.now()).inDays;
+                }
+
+                String countdownText;
+                if (daysLeft < 0) {
+                  countdownText = "Expired ${daysLeft.abs()} day(s) ago";
+                } else if (daysLeft == 0) {
+                  countdownText = "Expires today!";
+                } else {
+                  countdownText = "Expires in $daysLeft day(s)";
                 }
 
                 return Card(
                   child: ListTile(
                     leading: Icon(Icons.warning_amber_rounded, color: color),
                     title: Text(med),
-                    subtitle: Text(subtitle.toString()),
+                    subtitle: Text("Expiry Date: $expiryStr\n$countdownText"),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
                       tooltip: 'Delete alert',
@@ -410,7 +421,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
               itemBuilder: (ctx, i) {
                 final r = _reminders[i];
                 final key = r['key'] as String;
-                final notifBaseId = r['notifBaseId'] as int;
                 final title = (r['title'] ?? 'Unknown').toString();
                 final time = (r['time'] ?? '').toString();
                 final days = ((r['days'] as List?) ?? const [])

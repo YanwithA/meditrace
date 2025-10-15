@@ -6,11 +6,10 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class RoboflowService {
   final String apiKey;
-  final String modelId; // e.g. "medicine-box/1"
+  final String modelId;
   // Endpoint task: "detect" for object detection, "segment" for instance/semantic segmentation
   final String taskEndpoint;
-  // Optional explicit API host. If provided (non-empty), takes precedence over taskEndpoint.
-  // Example: "serverless.roboflow.com" to mirror Python InferenceHTTPClient usage.
+
   final String apiHost;
 
   RoboflowService({

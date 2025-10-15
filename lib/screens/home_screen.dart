@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Roboflow models
   static const String _apiKey = 'l5QBgJv58xaL9eaCh4rq';
-  static const String _boxModel = 'medicine-box-pcltm/1';
+  static const String _boxModel = 'medicine-box-pcltm/2';
   static const String _counterfeitModel = 'counterfeit_med_detection-tvqcg/2';
   late final RoboflowService _rfBox;
   late final RoboflowService _rfCounterfeit;
