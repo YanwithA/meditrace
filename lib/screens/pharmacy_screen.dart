@@ -16,7 +16,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
   LatLng? _currentPosition;
   List<Map<String, dynamic>> _pharmacies = [];
 
-  // ✅ Use your Places API key
+  // Places API key
   final String apiKey = "AIzaSyBWb3bHEVNK2SgYFuep3iPjCtDvHOXmf4k";
 
   @override
