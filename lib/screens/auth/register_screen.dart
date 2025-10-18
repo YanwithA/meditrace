@@ -25,6 +25,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
+  // ✅ Strong password validation (≥6 chars, upper, lower, number, special)
+  final RegExp _passwordRegex = RegExp(
+    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$',
+  );
+
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       if (_passwordController.text != _confirmPasswordController.text) {
@@ -70,11 +75,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
         } else if (e.code == 'invalid-email') {
           errorMessage = 'The email address is not valid.';
         }
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(errorMessage)));
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       } catch (e) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Registration failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Registration failed: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
 
       setState(() => _isLoading = false);
@@ -154,9 +170,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _emailController,
                     label: "Email",
                     prefixIcon: Icons.email_outlined,
-                    validator: (v) => v == null || v.isEmpty
-                        ? 'Enter your email'
-                        : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return 'Enter your email';
+                      } else if (!RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(v)) {
+                        return 'Enter a valid email address';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   _buildInputField(
@@ -164,16 +187,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: "Password",
                     prefixIcon: Icons.lock_outline,
                     obscureText: _obscurePassword,
-                    validator: (v) =>
-                    v != null && v.length < 6
-                        ? 'Password must be at least 6 characters'
-                        : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return 'Enter your password';
+                      } else if (!_passwordRegex.hasMatch(v)) {
+                        return 'Password must be ≥6 chars, include upper, lower, number & special';
+                      }
+                      return null;
+                    },
                     suffixIcon: IconButton(
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_outlined
                           : Icons.visibility_off_outlined),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -182,6 +209,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: "Confirm Password",
                     prefixIcon: Icons.lock_outline,
                     obscureText: _obscureConfirm,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return 'Confirm your password';
+                      }
+                      return null;
+                    },
                     suffixIcon: IconButton(
                       icon: Icon(_obscureConfirm
                           ? Icons.visibility_outlined

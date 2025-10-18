@@ -127,8 +127,8 @@ class NotificationService {
         : "⏳ $medicineName expires in $daysLeft day${daysLeft > 1 ? 's' : ''}";
 
     // Schedule only ONE notification for today at 9 AM
-    final nextNotifyTime = DateTime(now.year, now.month, now.day, 9, 0);
-    //final nextNotifyTime = now.add(const Duration(seconds: 10)); // triggers in 10s
+    //final nextNotifyTime = DateTime(now.year, now.month, now.day, 9, 0);
+    final nextNotifyTime = now.add(const Duration(seconds: 10)); // triggers in 10s
 
     await _notificationsPlugin.zonedSchedule(
       idBase,
